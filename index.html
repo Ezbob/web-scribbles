@@ -36,11 +36,6 @@
     // (this makes the waves animate faster)
     var ITERATIONS = 1;
 
-    let amplitudes = []
-    let frequencies = []
-    let phases = []
-    let yOffsets = []
-
     let sineParameters = (() => {
       let params = []
       let maxAmplitude = 4
@@ -83,16 +78,12 @@
 
     let timer = 0
 
-    const sin = (sample, phase, freq, amplitude, dt) => {
-      return Math.sin(sample * (freq ? freq : 1) + (phase ? phase : 0) + dt) * (amplitude ? amplitude : 1)
-    }
-
     const sampleSin = (sample, dt) => {
       let result = 0
       dt = dt ? dt : 1
       for (let i = 0; i < NUM_POINTS; ++i) {
         let param = sineParameters[i]
-        result += sin(sample, param.phase, param.frequency, param.amplitude, dt)
+        result += Math.sin(sample * param.frequency + param.phase) * param.amplitude
       }
       return result
     }
