@@ -41,50 +41,63 @@
     let phases = []
     let yOffsets = []
 
-    function makeWavePoints(numPoints) {
-      var t = [];
-      for (var n = 0; n < numPoints; n++) {
+    let sineParameters = (() => {
+      let params = []
+      let maxAmplitude = 4
+      let maxFrequencies = (1 / 16)
+      let maxPhases = (2 * Math.PI)
+
+      for (let i = 0; i < NUM_POINTS; ++i) {
+        params.push({
+          amplitude:  Math.random() * maxAmplitude,
+          frequency: Math.random() * maxFrequencies,
+          phase:  Math.random() * maxPhases
+        })
+      }
+      return params
+    })()
+
+    let wavePoints = (() => {
+      let t = [];
+      for (let n = 0; n < NUM_POINTS; n++) {
         // This represents a point on the wave
-        var newPoint = {
-          x: n / numPoints * WIDTH,
+        t.push({
+          x: n / NUM_POINTS * WIDTH,
           y: Y_OFFSET,
           spd: {
             y: 0
           }, // speed with vertical component zero
           mass: 1
-        }
-        t.push(newPoint);
+        });
       }
       return t
-    }
+    })()
 
-    let wavePoints = makeWavePoints(NUM_POINTS)
-    let offset = 0, isPaused = false
+    let offset = 0
+    let isPaused = false
+
+    let then, delta
+
+    let mouseMarker = null
+    let nearestPoint = null
+
+    let timer = 0
 
     const sin = (sample, phase, freq, amplitude, dt) => {
       return Math.sin(sample * (freq ? freq : 1) + (phase ? phase : 0) + dt) * (amplitude ? amplitude : 1)
-    }
-
-    function generateCompoundedSineParameters(num, maxAmplitude, maxFrequencies, maxPhases) {
-      maxPhases = maxPhases ? maxPhases : (2 * Math.PI)
-      for (let i = 0; i < num; ++i) {
-        amplitudes[i] = Math.random() * maxAmplitude
-        frequencies[i] = Math.random() * maxFrequencies
-        phases[i] = Math.random() * maxPhases
-      }
     }
 
     const sampleSin = (sample, dt) => {
       let result = 0
       dt = dt ? dt : 1
       for (let i = 0; i < NUM_POINTS; ++i) {
-        result += sin(sample, phases[i], frequencies[i], amplitudes[i], dt)
+        let param = sineParameters[i]
+        result += sin(sample, param.phase, param.frequency, param.amplitude, dt)
       }
       return result
     }
 
-    function updateWavePoints(points, dt, shouldWrapAround) {
-      //for (var i = 0; i < ITERATIONS; i++) {
+    const updateWavePoints = (points, dt, shouldWrapAround) => {
 
       for (var n = 0; n < points.length; n++) {
         var p = points[n];
@@ -127,14 +140,8 @@
         // Apply speed
         p.y = p.y + p.spd.y;
       }
-      //}
+
     }
-
-    let mouseMarker = null
-    let nearestPoint = null
-
-
-    let timer = 0
 
     const update = (dt) => {
       timer += dt
@@ -219,10 +226,6 @@
         mouseMarker = null
       }
 
-      let then, delta
-      let fps = 60, interval = 1000 / fps;
-
-
       window.onblur = () => {
         isPaused = true
       }
@@ -232,7 +235,7 @@
         isPaused = false
       }
 
-      generateCompoundedSineParameters(NUM_POINTS, 4, (1 / 16))
+      //generateCompoundedSineParameters(NUM_POINTS, 4, (1 / 16))
       canvas.width = 800
       canvas.height = 600
 
