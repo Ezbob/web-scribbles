@@ -19,19 +19,17 @@
   <script>
 
     // Resolution of simulation
-    var NUM_POINTS = 100;
-
+    const NUM_POINTS = 100;
     // Width of simulation
-    var WIDTH = 800;
-
+    const WIDTH = 800;
     // Spring constant for forces applied by adjacent points
-    var SPRING_CONSTANT = 0.006;
+    const SPRING_CONSTANT = 0.006;
     // Sprint constant for force applied to baseline
-    var SPRING_CONSTANT_BASELINE = 0.006;
+    const SPRING_CONSTANT_BASELINE = 0.006;
     // Vertical draw offset of simulation
-    var Y_OFFSET = 200;
+    const Y_OFFSET = 200;
     // Damping to apply to speed changes
-    var DAMPING = 0.99;
+    const DAMPING = 0.99;
 
     let sineParameters = (() => {
       let params = []
@@ -188,8 +186,6 @@
       }
 
       canvas.onmousedown = (ev) => {
-        if (ev.y > Y_OFFSET) console.log("BELOW")
-
         let m = { x: ev.x, y: ev.y }
         let closestDistance = Infinity
         let closestPointIndex = -1
@@ -210,7 +206,7 @@
         }
       }
 
-      canvas.onmouseup = (ev) => {
+      canvas.onmouseup = () => {
         mouseMarker = null
       }
 
