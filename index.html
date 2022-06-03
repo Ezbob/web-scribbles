@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>WAVES</title>
+  <style>
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0px;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="canvas"></canvas>
+
+  <script>
+
+    // Resolution of simulation
+    var NUM_POINTS = 100;
+
+    // Width of simulation
+    var WIDTH = 800;
+
+    // Spring constant for forces applied by adjacent points
+    var SPRING_CONSTANT = 0.006;
+    // Sprint constant for force applied to baseline
+    var SPRING_CONSTANT_BASELINE = 0.006;
+    // Vertical draw offset of simulation
+    var Y_OFFSET = 200;
+    // Damping to apply to speed changes
+    var DAMPING = 0.99;
+    // Number of iterations of point-influences-point to do on wave per step
+    // (this makes the waves animate faster)
+    var ITERATIONS = 1;
+
+    let amplitudes = []
+    let frequencies = []
+    let phases = []
+    let yOffsets = []
+
+    function makeWavePoints(numPoints) {
+      var t = [];
+      for (var n = 0; n < numPoints; n++) {
+        // This represents a point on the wave
+        var newPoint = {
+          x: n / numPoints * WIDTH,
+          y: Y_OFFSET,
+          spd: {
+            y: 0
+          }, // speed with vertical component zero
+          mass: 1
+        }
+        t.push(newPoint);
+      }
+      return t
+    }
+
+    let wavePoints = makeWavePoints(NUM_POINTS)
+    let offset = 0, isPaused = false
+
+    const sin = (sample, phase, freq, amplitude, dt) => {
+      return Math.sin(sample * (freq ? freq : 1) + (phase ? phase : 0) + dt) * (amplitude ? amplitude : 1)
+    }
+
+    function generateCompoundedSineParameters(num, maxAmplitude, maxFrequencies, maxPhases) {
+      maxPhases = maxPhases ? maxPhases : (2 * Math.PI)
+      for (let i = 0; i < num; ++i) {
+        amplitudes[i] = Math.random() * maxAmplitude
+        frequencies[i] = Math.random() * maxFrequencies
+        phases[i] = Math.random() * maxPhases
+      }
+    }
+
+    const sampleSin = (sample, dt) => {
+      let result = 0
+      dt = dt ? dt : 1
+      for (let i = 0; i < NUM_POINTS; ++i) {
+        result += sin(sample, phases[i], frequencies[i], amplitudes[i], dt)
+      }
+      return result
+    }
+
+    function updateWavePoints(points, dt, shouldWrapAround) {
+      //for (var i = 0; i < ITERATIONS; i++) {
+
+      for (var n = 0; n < points.length; n++) {
+        var p = points[n];
+        // force to apply to this point
+        var force = 0;
+
+        // forces caused by the point immediately to the left or the right
+        var forceFromLeft, forceFromRight, forceToBaseline;
+
+        if (n == 0) { // wrap to left-to-right
+          forceFromLeft = shouldWrapAround ? SPRING_CONSTANT * (points[points.length - 1].y - p.y) : 0
+        } else { // normally
+          var dy = points[n - 1].y - p.y;
+          forceFromLeft = SPRING_CONSTANT * dy;
+        }
+
+        if (n == points.length - 1) { // wrap to right-to-left
+          forceFromRight = shouldWrapAround ? SPRING_CONSTANT * (points[0].y - p.y) : 0
+        } else { // normally
+          var dy = points[n + 1].y - p.y;
+          forceFromRight = SPRING_CONSTANT * dy;
+        }
+
+        // Also apply force toward the baseline
+        var dy = Y_OFFSET - p.y;
+        forceToBaseline = SPRING_CONSTANT_BASELINE * dy;
+
+        // Sum up forces
+        force = force + forceFromLeft;
+        force = force + forceFromRight;
+        force = force + forceToBaseline;
+
+        // Calculate acceleration
+        var acceleration = force / p.mass;
+
+
+        // Apply acceleration (with damping)
+        p.spd.y = DAMPING * p.spd.y + acceleration;
+
+        // Apply speed
+        p.y = p.y + p.spd.y;
+      }
+      //}
+    }
+
+    let mouseMarker = null
+    let nearestPoint = null
+
+
+    let timer = 0
+
+    const update = (dt) => {
+      timer += dt
+
+      if (timer > 10) {
+        offset += 1
+      }
+
+      for (let i = 0; i < wavePoints.length; ++i) {
+        let currentWP = wavePoints[i]
+        currentWP.y += sampleSin(currentWP.x + offset) * (dt / 100)
+      }
+
+      updateWavePoints(wavePoints, dt)
+    }
+
+    const strokeCircle = (ctx, x, y, radius) => {
+      ctx.beginPath()
+      ctx.ellipse(x, y, radius, radius, 0, 0, 2 * Math.PI)
+      ctx.stroke()
+    }
+
+    const strokeLine = (ctx, x, y, ex, ey) => {
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+    }
+
+    const draw = (ctx) => {
+      ctx.clearRect(0, 0, 800, 600)
+
+      ctx.strokeStyle = `Red`
+      ctx.lineWidth = 1
+      strokeLine(ctx, 0, Y_OFFSET, WIDTH, Y_OFFSET)
+
+      if (mouseMarker != null) {
+        let lineLength = 100
+        strokeLine(ctx, mouseMarker.x, mouseMarker.y, nearestPoint.x + 5, nearestPoint.y)
+      }
+
+      ctx.strokeStyle = "Blue"
+      ctx.lineWidth = 4
+
+      for (let i = 0; i < wavePoints.length - 1; ++i) {
+        let wavePoint = wavePoints[i]
+        let nextWavePoint = wavePoints[i + 1]
+        strokeLine(ctx, 5 + wavePoint.x, wavePoint.y, 5 + nextWavePoint.x, nextWavePoint.y)
+      }
+    }
+
+    const main = () => {
+      let canvas = document.getElementById("canvas")
+      if (!canvas) {
+        throw "CANVAS not there"
+      }
+
+      canvas.onmousedown = (ev) => {
+        if (ev.y > Y_OFFSET) console.log("BELOW")
+
+        let m = { x: ev.x, y: ev.y }
+        let closestDistance = Infinity
+        let closestPointIndex = -1
+
+        for (let i = 0; i < wavePoints.length; ++i) {
+          let point = wavePoints[i]
+          let distance = Math.abs(m.x - point.x)
+          if (distance <= closestDistance) {
+            closestPointIndex = i
+            closestDistance = distance
+          }
+        }
+        if (isFinite(closestDistance)) {
+          let nextY = Math.min(m.y, wavePoints[closestPointIndex].y + 200)
+          wavePoints[closestPointIndex].y = nextY
+          mouseMarker = m
+          nearestPoint = wavePoints[closestPointIndex]
+        }
+      }
+
+      canvas.onmouseup = (ev) => {
+        mouseMarker = null
+      }
+
+      let then, delta
+      let fps = 60, interval = 1000 / fps;
+
+
+      window.onblur = () => {
+        isPaused = true
+      }
+
+      window.onfocus = () => {
+        then = undefined
+        isPaused = false
+      }
+
+      generateCompoundedSineParameters(NUM_POINTS, 4, (1 / 16))
+      canvas.width = 800
+      canvas.height = 600
+
+      let ctx = canvas.getContext('2d')
+
+      const gameLoop = (now) => {
+        delta = (now - (then || now))
+        then = now
+        window.requestAnimationFrame(gameLoop)
+        if (isPaused) return
+
+        update(delta)
+        draw(ctx)
+      }
+
+      window.requestAnimationFrame(gameLoop)
+    }
+
+    window.onload = main
+  </script>
+</body>
+
+</html>
