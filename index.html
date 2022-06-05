@@ -33,7 +33,8 @@
     // Number of sin waves compounded
     const SIN_PARAMS = 10;
 
-    let sineParameters = (() => {
+    // Generate sin parameters from constants
+    const sineParameters = (() => {
       let params = []
       let maxAmplitude = 4
       let maxFrequencies = (1 / 16)
@@ -49,7 +50,8 @@
       return params
     })()
 
-    let wavePoints = (() => {
+    // Generate wave points from constants
+    const wavePoints = (() => {
       let t = [];
       // Note: Over allocating points here to protect the ends of the water line
       // this makes the force calculation implementation simpler
@@ -90,12 +92,12 @@
 
     const applySpringForces = (points, baselineY, horizontalSpringForce, verticalSpringForce, damping) => {
       for (var n = 1; n < points.length - 1; n++) {
-        var leftPoint = points[n - 1]
-        var currentPoint = points[n]
-        var rightPoint = points[n + 1]
+        let leftPoint = points[n - 1]
+        let currentPoint = points[n]
+        let rightPoint = points[n + 1]
 
         // force to apply to this point
-        var force = 0;
+        let force = 0;
 
         // forces applied to the current point and it's immediate neighbors
         force = force + horizontalSpringForce * (leftPoint.y - currentPoint.y); // force to the left
@@ -103,10 +105,10 @@
         force = force + verticalSpringForce   * (baselineY - currentPoint.y); // downward force to the baseline
 
         // Calculate acceleration, can be left out if mass == 1
-        //var acceleration = force / currentPoint.mass;
+        let acceleration = force / currentPoint.mass;
 
         // Apply acceleration (with damping)
-        currentPoint.spd.y = damping * currentPoint.spd.y + force;
+        currentPoint.spd.y = damping * currentPoint.spd.y + acceleration;
 
         // Apply speed
         currentPoint.y = currentPoint.y + currentPoint.spd.y;
@@ -149,25 +151,31 @@
     const draw = (canvas, ctx) => {
       ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-      ctx.strokeStyle = `Red`
+      ctx.strokeStyle = "Red"
       ctx.lineWidth = 1
       ctx.strokeLine(0, Y_OFFSET, WIDTH, Y_OFFSET)
 
       if (mouseMarker != null) {
         let lineLength = 100
-        ctx.strokeLine(mouseMarker.x, mouseMarker.y, nearestPoint.x + 5, nearestPoint.y)
+        ctx.strokeLine(mouseMarker.x, mouseMarker.y, nearestPoint.x, nearestPoint.y)
+      }
+      
+      for (let i = 1; i < wavePoints.length - 1; ++i) {
+        ctx.strokeCircle(wavePoints[i].x, wavePoints[i].realY, 5)
       }
 
       ctx.strokeStyle = "Blue"
-      ctx.lineWidth = 4
+      ctx.lineWidth = 2
 
+      let oldJoin = ctx.lineJoin
+      ctx.lineJoin = "bevel"
       ctx.beginPath();
       ctx.moveTo(wavePoints[0], wavePoints[0]);
       for (let i = 1; i < wavePoints.length - 1; ++i) {
-        let wavePoint = wavePoints[i]
-        ctx.lineTo(wavePoint.x, wavePoint.realY);
+        ctx.lineTo(wavePoints[i].x, wavePoints[i].realY)
       }
       ctx.stroke()
+      ctx.lineJoin = oldJoin
     }
 
     const main = () => {
