@@ -19,32 +19,39 @@
   <script>
 
     // Resolution of simulation
-    const NUM_POINTS = 80;
+    const NUM_POINTS = 80
     // Width of simulation
-    const WIDTH = 800;
+    const WIDTH = 800
     // Spring constant for forces applied by adjacent points
-    const SPRING_CONSTANT_HORIZONTAL_FORCE = 0.006;
+    const SPRING_CONSTANT_HORIZONTAL_FORCE = 0.006
     // Sprint constant for force applied to baseline
-    const SPRING_CONSTANT_VERTICAL_FORCE = 0.006;
+    const SPRING_CONSTANT_VERTICAL_FORCE = 0.006
     // Vertical draw offset of simulation
-    const Y_OFFSET = 200;
+    const Y_OFFSET = 200
     // Damping to apply to speed changes
-    const DAMPING = 0.99;
+    const DAMPING = 0.99
+
+    // Background wave generation parameter
+
     // Number of sin waves compounded
-    const SIN_PARAMS = 10;
+    const SIN_PARAMS = 17
+    // timeout in seconds that determines the speed of waves
+    const WAVE_SPEED_TIMEOUT = 2
+    // Max amplitude of the generated sin parameters
+    const MAX_SIN_AMPLITUDE = 2
+    // Max frequency of the generated sin parameters
+    const MAX_SIN_FREQUENCY = (1 / 12)
+    // Max phase of the generated sin parameters
+    const MAX_SIN_START_PHASE = (2 * Math.PI)
 
     // Generate sin parameters from constants
     const sineParameters = (() => {
       let params = []
-      let maxAmplitude = 4
-      let maxFrequencies = (1 / 16)
-      let maxPhases = (2 * Math.PI)
-
       for (let i = 0; i < SIN_PARAMS; ++i) {
         params.push({
-          amplitude: Math.random() * maxAmplitude,
-          frequency: Math.random() * maxFrequencies,
-          phase: Math.random() * maxPhases
+          amplitude: Math.random() * MAX_SIN_AMPLITUDE,
+          frequency: Math.random() * MAX_SIN_FREQUENCY,
+          phase: Math.random() * MAX_SIN_START_PHASE
         })
       }
       return params
@@ -52,12 +59,12 @@
 
     // Generate wave points from constants
     const wavePoints = (() => {
-      let t = [];
+      let points = [];
       // Note: Over allocating points here to protect the ends of the water line
       // this makes the force calculation implementation simpler
       for (let n = 0; n < NUM_POINTS + 1; n++) {
         // This represents a point on the wave
-        t.push({
+        points.push({
           x: (n / (NUM_POINTS) * WIDTH) * ((NUM_POINTS + 2) / NUM_POINTS) - 10,
           y: Y_OFFSET,
           spd: {
@@ -68,7 +75,7 @@
           mass: 1
         });
       }
-      return t
+      return points
     })()
 
     let offset = 0
@@ -118,7 +125,7 @@
     const update = (dt) => {
       timer += dt
 
-      if (timer > 2) {
+      if (timer > WAVE_SPEED_TIMEOUT) {
         offset += 1
         timer = 0
       }
@@ -159,22 +166,35 @@
         let lineLength = 100
         ctx.strokeLine(mouseMarker.x, mouseMarker.y, nearestPoint.x, nearestPoint.y)
       }
-      
-      for (let i = 1; i < wavePoints.length - 1; ++i) {
-        ctx.strokeCircle(wavePoints[i].x, wavePoints[i].realY, 5)
-      }
 
       ctx.strokeStyle = "Blue"
       ctx.lineWidth = 2
 
       let oldJoin = ctx.lineJoin
       ctx.lineJoin = "bevel"
-      ctx.beginPath();
+      ctx.beginPath()
       ctx.moveTo(wavePoints[0], wavePoints[0]);
       for (let i = 1; i < wavePoints.length - 1; ++i) {
         ctx.lineTo(wavePoints[i].x, wavePoints[i].realY)
       }
       ctx.stroke()
+      ctx.closePath()
+
+
+      ctx.beginPath()
+      ctx.moveTo(wavePoints[0], wavePoints[0]);
+      // water top
+      for (let i = 1; i < wavePoints.length - 1; ++i) {
+        ctx.lineTo(wavePoints[i].x, wavePoints[i].realY)
+      }
+      // bottom "rectangle"
+      ctx.lineTo(wavePoints[wavePoints.length - 1].x, canvas.height)
+      ctx.lineTo(wavePoints[0].x, canvas.height)
+      ctx.lineTo(0, wavePoints[0].realY)
+      ctx.closePath()
+
+      ctx.fillStyle = "blue";
+      ctx.fill()
       ctx.lineJoin = oldJoin
     }
 
@@ -218,7 +238,7 @@
         isPaused = false
       }
 
-      canvas.width = 800
+      canvas.width = WIDTH
       canvas.height = 600
 
       let ctx = canvas.getContext('2d')
