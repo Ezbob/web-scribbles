@@ -30,6 +30,8 @@
     const Y_OFFSET = 200;
     // Damping to apply to speed changes
     const DAMPING = 0.99;
+    // Number of sin waves compounded
+    const SIN_PARAMS = 10;
 
     let sineParameters = (() => {
       let params = []
@@ -37,7 +39,7 @@
       let maxFrequencies = (1 / 16)
       let maxPhases = (2 * Math.PI)
 
-      for (let i = 0; i < NUM_POINTS; ++i) {
+      for (let i = 0; i < SIN_PARAMS; ++i) {
         params.push({
           amplitude: Math.random() * maxAmplitude,
           frequency: Math.random() * maxFrequencies,
@@ -49,14 +51,18 @@
 
     let wavePoints = (() => {
       let t = [];
-      for (let n = 0; n < NUM_POINTS; n++) {
+      // Note: Over allocating points here to protect the ends of the water line
+      // this makes the force calculation implementation simpler
+      for (let n = 0; n < NUM_POINTS + 1; n++) {
         // This represents a point on the wave
         t.push({
-          x: n / NUM_POINTS * WIDTH,
+          x: (n / (NUM_POINTS) * WIDTH) * ((NUM_POINTS + 2) / NUM_POINTS) - 10,
           y: Y_OFFSET,
           spd: {
             y: 0
           }, // speed with vertical component zero
+          waveY: 0,
+          realY: 0,
           mass: 1
         });
       }
@@ -73,19 +79,17 @@
 
     let timer = 0
 
-    const sampleSin = (sample, dt) => {
+    const sampleSin = (sample, params) => {
       let result = 0
-      dt = dt ? dt : 1
-      for (let i = 0; i < NUM_POINTS; ++i) {
-        let param = sineParameters[i]
+      for (let i = 0; i < params.length; ++i) {
+        let param = params[i]
         result += Math.sin(sample * param.frequency + param.phase) * param.amplitude
       }
       return result
     }
 
-    const updateWavePoints = (points, dt, shouldWrapAround, baselineY, horizontalSpringForce, verticalSpringForce, damping) => {
-
-      for (var n = 0; n < points.length; n++) {
+    const applySpringForces = (points, baselineY, horizontalSpringForce, verticalSpringForce, damping) => {
+      for (var n = 1; n < points.length - 1; n++) {
         var leftPoint = points[n - 1]
         var currentPoint = points[n]
         var rightPoint = points[n + 1]
@@ -93,99 +97,83 @@
         // force to apply to this point
         var force = 0;
 
-        // forces caused by the point immediately to the left or the right
-        var forceFromLeft, forceFromRight, forceToBaseline;
+        // forces applied to the current point and it's immediate neighbors
+        force = force + horizontalSpringForce * (leftPoint.y - currentPoint.y); // force to the left
+        force = force + horizontalSpringForce * (rightPoint.y - currentPoint.y); // force to the right
+        force = force + verticalSpringForce   * (baselineY - currentPoint.y); // downward force to the baseline
 
-        if (n == 0) { // wrap to left-to-right
-          forceFromLeft = shouldWrapAround ? horizontalSpringForce * (points[points.length - 1].y - currentPoint.y) : horizontalSpringForce
-        } else { // normally
-          forceFromLeft = horizontalSpringForce * (leftPoint.y - currentPoint.y);
-        }
-
-        if (n == points.length - 1) { // wrap to right-to-left
-          forceFromRight = shouldWrapAround ? horizontalSpringForce * (points[0].y - currentPoint.y) : horizontalSpringForce
-        } else { // normally
-          forceFromRight = horizontalSpringForce * (rightPoint.y - currentPoint.y);
-        }
-
-        // Also apply force toward the baseline
-        forceToBaseline = verticalSpringForce * (baselineY - currentPoint.y);
-
-        // Sum up forces
-        force = force + forceFromLeft;
-        force = force + forceFromRight;
-        force = force + forceToBaseline;
-
-        // Calculate acceleration
-        var acceleration = force / currentPoint.mass;
-
+        // Calculate acceleration, can be left out if mass == 1
+        //var acceleration = force / currentPoint.mass;
 
         // Apply acceleration (with damping)
-        currentPoint.spd.y = damping * currentPoint.spd.y + acceleration;
+        currentPoint.spd.y = damping * currentPoint.spd.y + force;
 
         // Apply speed
         currentPoint.y = currentPoint.y + currentPoint.spd.y;
       }
-
     }
 
     const update = (dt) => {
       timer += dt
 
-      if (timer > 100) {
+      if (timer > 2) {
         offset += 1
+        timer = 0
       }
 
-      updateWavePoints(wavePoints, dt, false, Y_OFFSET, SPRING_CONSTANT_HORIZONTAL_FORCE, SPRING_CONSTANT_VERTICAL_FORCE, DAMPING)
-
-      /*
-      for (let i = 0; i < wavePoints.length; ++i) {
-        let currentWP = wavePoints[i]
-        currentWP.y += sampleSin(currentWP.x + offset) * (dt / 1000)
+      for (let i = 1; i < NUM_POINTS; ++i) {
+        let wavePoint = wavePoints[i]
+        wavePoint.waveY = sampleSin(wavePoint.x + offset, sineParameters)
       }
-      */
+      applySpringForces(wavePoints, Y_OFFSET, SPRING_CONSTANT_HORIZONTAL_FORCE, SPRING_CONSTANT_VERTICAL_FORCE, DAMPING)
 
+      for (let i = 1; i < NUM_POINTS; ++i) {
+        let wavePoint = wavePoints[i]
+        wavePoint.realY = wavePoint.waveY + wavePoint.y
+      }
     }
 
-    const strokeCircle = (ctx, x, y, radius) => {
-      ctx.beginPath()
-      ctx.ellipse(x, y, radius, radius, 0, 0, 2 * Math.PI)
-      ctx.stroke()
+    CanvasRenderingContext2D.prototype.strokeCircle = function(x, y, radius) {
+      this.beginPath()
+      this.ellipse(x, y, radius, radius, 0, 0, 2 * Math.PI)
+      this.stroke()
     }
 
-    const strokeLine = (ctx, x, y, ex, ey) => {
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(ex, ey);
-      ctx.stroke();
+    CanvasRenderingContext2D.prototype.strokeLine = function(x, y, ex, ey) {
+      this.beginPath();
+      this.moveTo(x, y);
+      this.lineTo(ex, ey);
+      this.stroke();
     }
 
-    const draw = (ctx) => {
-      ctx.clearRect(0, 0, 800, 600)
+    const draw = (canvas, ctx) => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
 
       ctx.strokeStyle = `Red`
       ctx.lineWidth = 1
-      strokeLine(ctx, 0, Y_OFFSET, WIDTH, Y_OFFSET)
+      ctx.strokeLine(0, Y_OFFSET, WIDTH, Y_OFFSET)
 
       if (mouseMarker != null) {
         let lineLength = 100
-        strokeLine(ctx, mouseMarker.x, mouseMarker.y, nearestPoint.x + 5, nearestPoint.y)
+        ctx.strokeLine(mouseMarker.x, mouseMarker.y, nearestPoint.x + 5, nearestPoint.y)
       }
 
       ctx.strokeStyle = "Blue"
       ctx.lineWidth = 4
 
-      for (let i = 0; i < wavePoints.length - 1; ++i) {
+      ctx.beginPath();
+      ctx.moveTo(wavePoints[0], wavePoints[0]);
+      for (let i = 1; i < wavePoints.length - 1; ++i) {
         let wavePoint = wavePoints[i]
-        let nextWavePoint = wavePoints[i + 1]
-        strokeLine(ctx, 5 + wavePoint.x, wavePoint.y, 5 + nextWavePoint.x, nextWavePoint.y)
+        ctx.lineTo(wavePoint.x, wavePoint.realY);
       }
+      ctx.stroke()
     }
 
     const main = () => {
       let canvas = document.getElementById("canvas")
       if (!canvas) {
-        throw "CANVAS not there"
+        throw "CANVAS with id 'canvas' is not there"
       }
 
       canvas.onmousedown = (ev) => {
@@ -234,7 +222,7 @@
         if (isPaused) return
 
         update(delta)
-        draw(ctx)
+        draw(canvas, ctx)
       }
 
       window.requestAnimationFrame(gameLoop)
