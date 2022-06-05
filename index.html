@@ -19,13 +19,13 @@
   <script>
 
     // Resolution of simulation
-    const NUM_POINTS = 100;
+    const NUM_POINTS = 80;
     // Width of simulation
     const WIDTH = 800;
     // Spring constant for forces applied by adjacent points
-    const SPRING_CONSTANT = 0.006;
+    const SPRING_CONSTANT_HORIZONTAL_FORCE = 0.006;
     // Sprint constant for force applied to baseline
-    const SPRING_CONSTANT_BASELINE = 0.006;
+    const SPRING_CONSTANT_VERTICAL_FORCE = 0.006;
     // Vertical draw offset of simulation
     const Y_OFFSET = 200;
     // Damping to apply to speed changes
@@ -39,9 +39,9 @@
 
       for (let i = 0; i < NUM_POINTS; ++i) {
         params.push({
-          amplitude:  Math.random() * maxAmplitude,
+          amplitude: Math.random() * maxAmplitude,
           frequency: Math.random() * maxFrequencies,
-          phase:  Math.random() * maxPhases
+          phase: Math.random() * maxPhases
         })
       }
       return params
@@ -83,10 +83,13 @@
       return result
     }
 
-    const updateWavePoints = (points, dt, shouldWrapAround) => {
+    const updateWavePoints = (points, dt, shouldWrapAround, baselineY, horizontalSpringForce, verticalSpringForce, damping) => {
 
       for (var n = 0; n < points.length; n++) {
-        var p = points[n];
+        var leftPoint = points[n - 1]
+        var currentPoint = points[n]
+        var rightPoint = points[n + 1]
+
         // force to apply to this point
         var force = 0;
 
@@ -94,22 +97,19 @@
         var forceFromLeft, forceFromRight, forceToBaseline;
 
         if (n == 0) { // wrap to left-to-right
-          forceFromLeft = shouldWrapAround ? SPRING_CONSTANT * (points[points.length - 1].y - p.y) : 0
+          forceFromLeft = shouldWrapAround ? horizontalSpringForce * (points[points.length - 1].y - currentPoint.y) : horizontalSpringForce
         } else { // normally
-          var dy = points[n - 1].y - p.y;
-          forceFromLeft = SPRING_CONSTANT * dy;
+          forceFromLeft = horizontalSpringForce * (leftPoint.y - currentPoint.y);
         }
 
         if (n == points.length - 1) { // wrap to right-to-left
-          forceFromRight = shouldWrapAround ? SPRING_CONSTANT * (points[0].y - p.y) : 0
+          forceFromRight = shouldWrapAround ? horizontalSpringForce * (points[0].y - currentPoint.y) : horizontalSpringForce
         } else { // normally
-          var dy = points[n + 1].y - p.y;
-          forceFromRight = SPRING_CONSTANT * dy;
+          forceFromRight = horizontalSpringForce * (rightPoint.y - currentPoint.y);
         }
 
         // Also apply force toward the baseline
-        var dy = Y_OFFSET - p.y;
-        forceToBaseline = SPRING_CONSTANT_BASELINE * dy;
+        forceToBaseline = verticalSpringForce * (baselineY - currentPoint.y);
 
         // Sum up forces
         force = force + forceFromLeft;
@@ -117,14 +117,14 @@
         force = force + forceToBaseline;
 
         // Calculate acceleration
-        var acceleration = force / p.mass;
+        var acceleration = force / currentPoint.mass;
 
 
         // Apply acceleration (with damping)
-        p.spd.y = DAMPING * p.spd.y + acceleration;
+        currentPoint.spd.y = damping * currentPoint.spd.y + acceleration;
 
         // Apply speed
-        p.y = p.y + p.spd.y;
+        currentPoint.y = currentPoint.y + currentPoint.spd.y;
       }
 
     }
@@ -132,16 +132,19 @@
     const update = (dt) => {
       timer += dt
 
-      if (timer > 10) {
+      if (timer > 100) {
         offset += 1
       }
 
+      updateWavePoints(wavePoints, dt, false, Y_OFFSET, SPRING_CONSTANT_HORIZONTAL_FORCE, SPRING_CONSTANT_VERTICAL_FORCE, DAMPING)
+
+      /*
       for (let i = 0; i < wavePoints.length; ++i) {
         let currentWP = wavePoints[i]
-        currentWP.y += sampleSin(currentWP.x + offset) * (dt / 100)
+        currentWP.y += sampleSin(currentWP.x + offset) * (dt / 1000)
       }
+      */
 
-      updateWavePoints(wavePoints, dt)
     }
 
     const strokeCircle = (ctx, x, y, radius) => {
