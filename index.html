@@ -146,13 +146,15 @@
       this.beginPath()
       this.ellipse(x, y, radius, radius, 0, 0, 2 * Math.PI)
       this.stroke()
+      this.closePath()
     }
 
     CanvasRenderingContext2D.prototype.strokeLine = function(x, y, ex, ey) {
-      this.beginPath();
-      this.moveTo(x, y);
-      this.lineTo(ex, ey);
-      this.stroke();
+      this.beginPath()
+      this.moveTo(x, y)
+      this.lineTo(ex, ey)
+      this.stroke()
+      this.closePath()
     }
 
     const draw = (canvas, ctx) => {
