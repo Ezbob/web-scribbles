@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+  <head></head>
+  <body>
+    <canvas id="canvas"></canvas>
+  </body>
+
+  <script>
+    /** @type {HTMLCanvasElement} canvas */
+    let canvas = null
+
+    /** @type {CanvasRenderingContext2D} */
+    let ctx = null
+
+    let mouseClick = null
+
+    let delta = 0
+    let then, now = 0
+    let isPaused = false
+
+    const BASELINE_Y = 200
+    const NUM_POINTS = 62
+    const WINDOW_WIDTH = 600, WINDOW_HEIGHT = 800
+
+    let wavePoints = (() => {
+      let points = []
+      // Note: Over allocating points here to protect the ends of the water line
+      // this makes the force calculation implementation simpler
+      for (let n = 0; n < NUM_POINTS + 1; n++) {
+        // This represents a point on the wave
+        points.push({
+          x: (n / (NUM_POINTS) * WINDOW_WIDTH) * ((NUM_POINTS + 2) / NUM_POINTS) - 10,
+          y: BASELINE_Y
+        });
+      }
+      return points
+    })()
+
+    CanvasRenderingContext2D.prototype.strokeCircle = function(x, y, radius) {
+      this.beginPath()
+      this.ellipse(x, y, radius, radius, 0, 0, 2 * Math.PI)
+      this.stroke()
+      this.closePath()
+    }
+
+    CanvasRenderingContext2D.prototype.strokeLine = function(x, y, ex, ey) {
+      this.beginPath()
+      this.moveTo(x, y)
+      this.lineTo(ex, ey)
+      this.stroke()
+      this.closePath()
+    }
+
+    const update = () => {
+      
+    }
+
+    const draw = () => {
+      ctx.clearRect(0,0, canvas.width, canvas.height)
+
+      ctx.strokeStyle = "Red"
+      ctx.lineWidth = 2
+      ctx.strokeLine(0, BASELINE_Y, canvas.width, BASELINE_Y)
+
+      ctx.strokeStyle = "Blue"
+      for (let i = 0; i < wavePoints.length; ++i) {
+        let wavePoint =  wavePoints[i]
+        ctx.strokeCircle(wavePoint.x, wavePoint.y, 5)
+      }
+
+      ctx.strokeStyle = "Green"
+      ctx.lineJoin = "bevel"
+      ctx.beginPath()
+      ctx.moveTo(wavePoints[0].x, wavePoints[0].y)
+      for (let i = 0; i < wavePoints.length; ++i) {
+        ctx.lineTo(wavePoints[i].x, wavePoints[i].y)
+      }
+      ctx.stroke()
+      ctx.closePath()
+    }
+
+    const gameLoop = (time) => {
+      now = time
+      delta = (now - (then || now))
+      then = now
+      window.requestAnimationFrame(gameLoop)
+      if (isPaused) return
+
+      update()
+      draw()
+    }
+
+    const onCanvasClick = (event) => {
+      mouseClick = {x: event.x, y: event.y}
+    }
+    
+    const onCanvasClickRelease = (event) => {
+      mouseClick = null
+    }
+
+    window.onload = () => {
+      canvas = document.getElementById("canvas")
+      if (!canvas) {
+        throw "canvas not there"
+      }
+
+      canvas.width = WINDOW_WIDTH
+      canvas.height = WINDOW_HEIGHT
+
+      ctx = canvas.getContext("2d")
+      if (!ctx) {
+        throw "2d context not there"
+      }
+
+      canvas.onmousedown = onCanvasClick
+      canvas.onmouseup = onCanvasClickRelease
+
+      window.requestAnimationFrame(gameLoop)
+    }
+  </script>
+</html>
