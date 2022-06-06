@@ -12,7 +12,6 @@
     /** @type {CanvasRenderingContext2D} */
     let ctx = null
 
-    let mouseClick = null
 
     let delta = 0
     let then, now = 0
@@ -22,6 +21,10 @@
     const NUM_POINTS = 62
     const WINDOW_WIDTH = 600, WINDOW_HEIGHT = 800
 
+    const FREQUENCY = 0.02
+
+    let source = null , mouseClick = null
+
     let wavePoints = (() => {
       let points = []
       // Note: Over allocating points here to protect the ends of the water line
@@ -30,7 +33,8 @@
         // This represents a point on the wave
         points.push({
           x: (n / (NUM_POINTS) * WINDOW_WIDTH) * ((NUM_POINTS + 2) / NUM_POINTS) - 10,
-          y: BASELINE_Y
+          y: BASELINE_Y,
+          waveY: 0
         });
       }
       return points
@@ -51,8 +55,49 @@
       this.closePath()
     }
 
+    class AnimationTimer {
+      constructor(timeout, increment) {
+        this.timeout = timeout
+        this.increment = increment ? increment : 1
+        this.time = 0
+        this.accumulator = 0
+      }
+
+      update(dt) {
+        this.time += dt
+      }
+
+      isTimeout() {
+        return this.time > this.timeout
+      }
+
+      next() {
+        if (this.isTimeout()) {
+          this.accumulator++
+          this.time = 0
+        }
+        return this.accumulator
+      }
+
+      reset(timeout) {
+        if (timeout) this.timeout = timeout
+        this.time = 0
+        this.accumulator = 0
+      }
+    }
+
+    let timers = [new AnimationTimer(50)]
+
     const update = () => {
-      
+      for (let t of timers) {
+        t.update(delta)
+      }
+
+      for (let i = 0; i < wavePoints.length; ++i) {
+        let wavePoint = wavePoints[i]
+
+        wavePoint.waveY = 2 * Math.sin(FREQUENCY * wavePoint.x + timers[0].next())
+      }
     }
 
     const draw = () => {
@@ -65,18 +110,24 @@
       ctx.strokeStyle = "Blue"
       for (let i = 0; i < wavePoints.length; ++i) {
         let wavePoint =  wavePoints[i]
-        ctx.strokeCircle(wavePoint.x, wavePoint.y, 5)
+        ctx.strokeCircle(wavePoint.x, wavePoint.y + wavePoint.waveY, 5)
       }
 
       ctx.strokeStyle = "Green"
       ctx.lineJoin = "bevel"
       ctx.beginPath()
       ctx.moveTo(wavePoints[0].x, wavePoints[0].y)
-      for (let i = 0; i < wavePoints.length; ++i) {
-        ctx.lineTo(wavePoints[i].x, wavePoints[i].y)
+      for (let wavePoint of wavePoints) {
+        ctx.lineTo(wavePoint.x, wavePoint.y + wavePoint.waveY)
       }
       ctx.stroke()
       ctx.closePath()
+
+      ctx.strokeStyle = "Red"
+      ctx.lineWidth = 2
+      if (source && mouseClick) {
+        ctx.strokeLine(mouseClick.x, mouseClick.y, source.x, source.y)
+      }
     }
 
     const gameLoop = (time) => {
@@ -92,10 +143,28 @@
 
     const onCanvasClick = (event) => {
       mouseClick = {x: event.x, y: event.y}
+
+      let closestDistance = Infinity
+      let closestIndex = -1
+      for (let i = 0; i < wavePoints.length; i++) {
+        let wavePoint = wavePoints[i]
+        let distance = Math.abs(wavePoint.x - mouseClick.x)
+        if (distance <= closestDistance) {
+          closestDistance = distance
+          closestIndex = i
+        }
+      }
+
+      if (isFinite(closestDistance)) {
+        source = wavePoints[closestIndex]
+
+        let distance = Math.abs(BASELINE_Y - (mouseClick.y))
+        wavePoints[closestIndex].y += 1.0 / (distance * distance) * Math.sin(distance * FREQUENCY) + BASELINE_Y
+      }
     }
     
     const onCanvasClickRelease = (event) => {
-      mouseClick = null
+      source = mouseClick = null
     }
 
     window.onload = () => {
