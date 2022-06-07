@@ -10,13 +10,129 @@
       height: 100%;
       margin: 0px;
     }
+
+    #ui {
+      position: absolute;
+      left: 850px;
+      top: 120px;
+      width: 400px;
+      border: solid black 2px;
+      height: 400px;
+    }
+
+    #ui-content {
+      display: flex;
+    }
+
+    #ui-inner-content {
+      position: relative;
+      padding: 5px;
+    }
+
+    .ui-header {
+      border: solid black 2px;
+      margin-top: 0px;
+      margin-bottom: 10px;
+      font-family: monospace;
+      text-align: center;
+      font-size: 13pt;
+    }
+
+    .ui-text-label {
+      flex: 2;
+    }
+
+    .ui-text-slider {
+      flex: 2;
+    }
+
+    .ui-elem {
+      border: solid black 1px;
+      padding: 4px;
+      margin-top: 15px;
+    }
+
+    .ui-row {
+      display: flex;
+    }
+
+    .ui-text-value {
+      flex: 1.2;
+      width: 50px;
+    }
+
+    .ui-reset-button {
+      flex: 0.2;
+      width: 20px;
+      height: 20px;
+      margin-left: 5px;
+      margin-top: 4px;
+      text-align: center;
+    }
   </style>
 </head>
 
 <body>
   <canvas id="canvas"></canvas>
 
+  <section id="ui">
+    <div id="ui-inner-content">
+      <h4 class="ui-header">Variables</h4>
+    </div>
+  </section>
+
   <script>
+
+    const buildSlider = (parent, name, text, initialValue, maxValue, minValue, stepValue) => {
+      let elm = document.createElement("div")
+      elm.className = "ui-elem"
+
+      let firstRow = document.createElement("div")
+      firstRow.className = "ui-row"
+
+      let secondRow = document.createElement("div")
+      secondRow.classList = "ui-row"
+
+      let sliderLabel = document.createElement("label")
+      sliderLabel.textContent = text
+      sliderLabel.className = "ui-text-label"
+
+      let valueField = document.createElement("input")
+      valueField.value = initialValue
+      valueField.classList.add("ui-text-value", `ui-value-${name}`)
+      valueField.contentEditable = "false"
+
+      let inputField = document.createElement("input")
+      inputField.type = "range"
+      inputField.min = minValue
+      inputField.max = maxValue
+      inputField.step = stepValue
+      inputField.value = initialValue
+      inputField.classList.add("ui-text-slider", `ui-slider-${name}`)
+
+      let resetButton = document.createElement("button")
+      resetButton.className = "ui-reset-button"
+      resetButton.textContent = "reset"
+
+      firstRow.appendChild(sliderLabel)
+      firstRow.appendChild(valueField)
+      elm.appendChild(firstRow)
+
+      secondRow.appendChild(inputField)
+      secondRow.appendChild(resetButton)
+      elm.appendChild(secondRow)
+
+      parent.appendChild(elm)
+
+      resetButton.onclick = () => {
+        inputField.value = initialValue
+      }
+
+      return [valueField, inputField, resetButton]
+    }
+
+    let hspring_slider_pair = null
+    let vspring_slider_pair = null
 
     // Resolution of simulation
     const NUM_POINTS = 80
@@ -110,7 +226,7 @@
         // forces applied to the current point and it's immediate neighbors
         force = force + horizontalSpringForce * (leftPoint.y - currentPoint.y); // force to the left
         force = force + horizontalSpringForce * (rightPoint.y - currentPoint.y); // force to the right
-        force = force + verticalSpringForce   * (baselineY - currentPoint.y); // downward force to the baseline
+        force = force + verticalSpringForce * (baselineY - currentPoint.y); // downward force to the baseline
 
         // Calculate acceleration, can be left out if mass == 1
         let acceleration = force / currentPoint.mass;
@@ -123,8 +239,15 @@
       }
     }
 
+    const updateUI = () => {
+      hspring_slider_pair[0].value = hspring_slider_pair[1].value
+      vspring_slider_pair[0].value = vspring_slider_pair[1].value
+    }
+
     const update = (dt) => {
       timer += dt
+
+      updateUI()
 
       if (timer > WAVE_SPEED_TIMEOUT) {
         offset += 1
@@ -135,7 +258,7 @@
         let wavePoint = wavePoints[i]
         wavePoint.waveY = sampleSin(wavePoint.x + offset, sineParameters)
       }
-      applySpringForces(wavePoints, Y_OFFSET, SPRING_CONSTANT_HORIZONTAL_FORCE, SPRING_CONSTANT_VERTICAL_FORCE, DAMPING)
+      applySpringForces(wavePoints, Y_OFFSET, hspring_slider_pair[0].value, SPRING_CONSTANT_VERTICAL_FORCE, DAMPING)
 
       for (let i = 1; i < NUM_POINTS; ++i) {
         let wavePoint = wavePoints[i]
@@ -143,14 +266,14 @@
       }
     }
 
-    CanvasRenderingContext2D.prototype.strokeCircle = function(x, y, radius) {
+    CanvasRenderingContext2D.prototype.strokeCircle = function (x, y, radius) {
       this.beginPath()
       this.ellipse(x, y, radius, radius, 0, 0, 2 * Math.PI)
       this.stroke()
       this.closePath()
     }
 
-    CanvasRenderingContext2D.prototype.strokeLine = function(x, y, ex, ey) {
+    CanvasRenderingContext2D.prototype.strokeLine = function (x, y, ex, ey) {
       this.beginPath()
       this.moveTo(x, y)
       this.lineTo(ex, ey)
@@ -206,6 +329,13 @@
       if (!canvas) {
         throw "CANVAS with id 'canvas' is not there"
       }
+
+      const container = document.getElementById("ui-inner-content")
+
+      hspring_slider_pair = buildSlider(container, "hspring", "Horizontal splash force", SPRING_CONSTANT_HORIZONTAL_FORCE, 0.09, 0.00001, 0.00001)
+
+      vspring_slider_pair = buildSlider(container, "vspring", "Vertical splash force", SPRING_CONSTANT_VERTICAL_FORCE, 0.09, 0.00001, 0.00001)
+
 
       canvas.onmousedown = (ev) => {
         let m = { x: ev.x, y: ev.y }
