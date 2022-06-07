@@ -77,7 +77,7 @@
 
   <section id="ui">
     <div id="ui-inner-content">
-      <h4 class="ui-header">Variables</h4>
+      <h4 class="ui-header">Tweak variables</h4>
     </div>
   </section>
 
@@ -133,6 +133,7 @@
 
     let hspring_slider_pair = null
     let vspring_slider_pair = null
+    let damping_slider_pair = null
 
     // Resolution of simulation
     const NUM_POINTS = 80
@@ -242,6 +243,7 @@
     const updateUI = () => {
       hspring_slider_pair[0].value = hspring_slider_pair[1].value
       vspring_slider_pair[0].value = vspring_slider_pair[1].value
+      damping_slider_pair[0].value = damping_slider_pair[1].value
     }
 
     const update = (dt) => {
@@ -258,7 +260,8 @@
         let wavePoint = wavePoints[i]
         wavePoint.waveY = sampleSin(wavePoint.x + offset, sineParameters)
       }
-      applySpringForces(wavePoints, Y_OFFSET, hspring_slider_pair[0].value, SPRING_CONSTANT_VERTICAL_FORCE, DAMPING)
+
+      applySpringForces(wavePoints, Y_OFFSET, hspring_slider_pair[0].value, vspring_slider_pair[0].value, damping_slider_pair[0].value)
 
       for (let i = 1; i < NUM_POINTS; ++i) {
         let wavePoint = wavePoints[i]
@@ -336,6 +339,7 @@
 
       vspring_slider_pair = buildSlider(container, "vspring", "Vertical splash force", SPRING_CONSTANT_VERTICAL_FORCE, 0.09, 0.00001, 0.00001)
 
+      damping_slider_pair = buildSlider(container, "damp", "Splash damping", DAMPING, 1.0, 0.001, 0.001)
 
       canvas.onmousedown = (ev) => {
         let m = { x: ev.x, y: ev.y }
