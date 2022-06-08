@@ -131,9 +131,43 @@
       return [valueField, inputField, resetButton]
     }
 
+    const genSinParameters = (sin_samples) => {
+      let params = []
+      for (let i = 0; i < sin_samples; ++i) {
+        params.push({
+          amplitude: Math.random() * MAX_SIN_AMPLITUDE,
+          frequency: Math.random() * MAX_SIN_FREQUENCY,
+          phase: Math.random() * MAX_SIN_START_PHASE
+        })
+      }
+      return params
+    }
+
+    const genWavePoints = (num_points) => {
+      let points = [];
+      // Note: Over allocating points here to protect the ends of the water line
+      // this makes the force calculation implementation simpler
+      for (let n = 0; n < num_points + 1; n++) {
+        // This represents a point on the wave
+        points.push({
+          x: (n / (num_points) * WIDTH) * ((num_points + 2) / num_points) - 10,
+          y: Y_OFFSET,
+          spd: {
+            y: 0
+          }, // speed with vertical component zero
+          waveY: 0,
+          realY: 0,
+          mass: 1
+        });
+      }
+      return points
+    }
+
     let hspring_slider_pair = null
     let vspring_slider_pair = null
     let damping_slider_pair = null
+    let wpoints_slider_pair = null
+    let sinsamples_slider_pair = null
 
     // Resolution of simulation
     const NUM_POINTS = 80
@@ -146,7 +180,7 @@
     // Vertical draw offset of simulation
     const Y_OFFSET = 200
     // Damping to apply to speed changes
-    const DAMPING = 0.99
+    const DAMPING = 1. - 0.97
 
     // Background wave generation parameter
 
@@ -162,38 +196,10 @@
     const MAX_SIN_START_PHASE = (2 * Math.PI)
 
     // Generate sin parameters from constants
-    const sineParameters = (() => {
-      let params = []
-      for (let i = 0; i < SIN_PARAMS; ++i) {
-        params.push({
-          amplitude: Math.random() * MAX_SIN_AMPLITUDE,
-          frequency: Math.random() * MAX_SIN_FREQUENCY,
-          phase: Math.random() * MAX_SIN_START_PHASE
-        })
-      }
-      return params
-    })()
+    let sineParameters = (genSinParameters)(NUM_POINTS)
 
     // Generate wave points from constants
-    const wavePoints = (() => {
-      let points = [];
-      // Note: Over allocating points here to protect the ends of the water line
-      // this makes the force calculation implementation simpler
-      for (let n = 0; n < NUM_POINTS + 1; n++) {
-        // This represents a point on the wave
-        points.push({
-          x: (n / (NUM_POINTS) * WIDTH) * ((NUM_POINTS + 2) / NUM_POINTS) - 10,
-          y: Y_OFFSET,
-          spd: {
-            y: 0
-          }, // speed with vertical component zero
-          waveY: 0,
-          realY: 0,
-          mass: 1
-        });
-      }
-      return points
-    })()
+    let wavePoints = (genWavePoints)(NUM_POINTS)
 
     let offset = 0
     let isPaused = false
@@ -233,7 +239,7 @@
         let acceleration = force / currentPoint.mass;
 
         // Apply acceleration (with damping)
-        currentPoint.spd.y = damping * currentPoint.spd.y + acceleration;
+        currentPoint.spd.y = (1. - damping) * currentPoint.spd.y + acceleration;
 
         // Apply speed
         currentPoint.y = currentPoint.y + currentPoint.spd.y;
@@ -244,6 +250,8 @@
       hspring_slider_pair[0].value = hspring_slider_pair[1].value
       vspring_slider_pair[0].value = vspring_slider_pair[1].value
       damping_slider_pair[0].value = damping_slider_pair[1].value
+      wpoints_slider_pair[0].value = wpoints_slider_pair[1].value
+      sinsamples_slider_pair[0].value = sinsamples_slider_pair[1].value
     }
 
     const update = (dt) => {
@@ -256,14 +264,14 @@
         timer = 0
       }
 
-      for (let i = 1; i < NUM_POINTS; ++i) {
+      for (let i = 0; i < wavePoints.length; ++i) {
         let wavePoint = wavePoints[i]
         wavePoint.waveY = sampleSin(wavePoint.x + offset, sineParameters)
       }
 
       applySpringForces(wavePoints, Y_OFFSET, hspring_slider_pair[0].value, vspring_slider_pair[0].value, damping_slider_pair[0].value)
 
-      for (let i = 1; i < NUM_POINTS; ++i) {
+      for (let i = 0; i < wavePoints.length; ++i) {
         let wavePoint = wavePoints[i]
         wavePoint.realY = wavePoint.waveY + wavePoint.y
       }
@@ -299,7 +307,6 @@
       ctx.strokeStyle = "Blue"
       ctx.lineWidth = 2
 
-      let oldJoin = ctx.lineJoin
       ctx.lineJoin = "bevel"
       ctx.beginPath()
       ctx.moveTo(wavePoints[0], wavePoints[0]);
@@ -324,7 +331,6 @@
 
       ctx.fillStyle = "blue";
       ctx.fill()
-      ctx.lineJoin = oldJoin
     }
 
     const main = () => {
@@ -335,11 +341,27 @@
 
       const container = document.getElementById("ui-inner-content")
 
-      hspring_slider_pair = buildSlider(container, "hspring", "Horizontal splash force", SPRING_CONSTANT_HORIZONTAL_FORCE, 0.09, 0.00001, 0.00001)
+      hspring_slider_pair = buildSlider(container, "hspring", "Horizontal splash force", SPRING_CONSTANT_HORIZONTAL_FORCE, 0.20, 0.00001, 0.00001)
 
-      vspring_slider_pair = buildSlider(container, "vspring", "Vertical splash force", SPRING_CONSTANT_VERTICAL_FORCE, 0.09, 0.00001, 0.00001)
+      vspring_slider_pair = buildSlider(container, "vspring", "Vertical splash force", SPRING_CONSTANT_VERTICAL_FORCE, 0.20, 0.00001, 0.00001)
 
-      damping_slider_pair = buildSlider(container, "damp", "Splash damping", DAMPING, 1.0, 0.001, 0.001)
+      damping_slider_pair = buildSlider(container, "damp", "Splash damping", DAMPING, 0.9999, 0.001, 0.001)
+
+      wpoints_slider_pair = buildSlider(container, "wpoints", "Wave samples", NUM_POINTS, 200, 10, 1)
+
+      sinsamples_slider_pair = buildSlider(container, "sinsam", "Sin samples", SIN_PARAMS, 200, 10, 1)
+
+      wpoints_slider_pair[1].onmouseup = () => {
+        isPaused = true
+        wavePoints = genWavePoints(Number(wpoints_slider_pair[0].value))
+        isPaused = false
+      }
+
+      sinsamples_slider_pair[1].onmouseup = () => {
+        isPaused = true
+        sineParameters = genSinParameters(Number(sinsamples_slider_pair[0].value))
+        isPaused = false
+      }
 
       canvas.onmousedown = (ev) => {
         let m = { x: ev.x, y: ev.y }
